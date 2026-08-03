@@ -1,0 +1,7 @@
+en:
+  site_settings:
+    sevilla_news_enabled: "Enable the daily Sevilla FC news digest topic."
+    sevilla_news_category_id: "Category the daily news topic is posted to."
+    sevilla_news_deepl_api_key: "DeepL API key (free or pro) used to translate headlines and excerpts from Spanish to English. Leave blank to post original Spanish text untranslated."
+    sevilla_news_articles_per_source: "How many of the latest articles to pull from each source per day."
+    sevilla_news_post_hour: "Server-local hour (0-23) after which the daily digest topic is posted. The job checks every 30 minutes and posts once per calendar day, at or after this hour."

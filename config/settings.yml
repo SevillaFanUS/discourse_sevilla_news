@@ -1,0 +1,26 @@
+plugins:
+  sevilla_news_enabled:
+    client: true
+    default: true
+
+  sevilla_news_category_id:
+    client: false
+    type: category
+    default: ""
+
+  sevilla_news_deepl_api_key:
+    client: false
+    secret: true
+    default: ""
+
+  sevilla_news_articles_per_source:
+    client: false
+    default: 5
+    min: 1
+    max: 15
+
+  sevilla_news_post_hour:
+    client: false
+    default: 8
+    min: 0
+    max: 23
