@@ -8,9 +8,13 @@ plugins:
     type: category
     default: ""
 
-  sevilla_news_deepl_api_key:
+  sevilla_news_azure_translator_key:
     client: false
     secret: true
+    default: ""
+
+  sevilla_news_azure_translator_region:
+    client: false
     default: ""
 
   sevilla_news_articles_per_source:

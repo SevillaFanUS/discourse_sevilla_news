@@ -46,9 +46,21 @@ module ::Jobs
 
     def build_enriched_articles(new_articles)
       new_articles.filter_map do |article|
-        excerpt = ::SevillaNews::Sources.meta_description(article.url)
-        translated_title = ::SevillaNews::DeeplTranslator.translate(article.title)
-        translated_excerpt = excerpt.present? ? ::SevillaNews::DeeplTranslator.translate(excerpt) : nil
+        # RSS sources already carry an excerpt from their feed; the two
+        # scraped HTML sources need a separate fetch for the article's own
+        # meta description.
+        excerpt = article.excerpt.presence || ::SevillaNews::Sources.meta_description(article.url)
+
+        # English-language sources (The Guardian, Football España) skip
+        # translation entirely rather than round-tripping already-English
+        # text through the API.
+        if article.source_lang == "en"
+          translated_title = article.title
+          translated_excerpt = excerpt
+        else
+          translated_title = ::SevillaNews::AzureTranslator.translate(article.title)
+          translated_excerpt = excerpt.present? ? ::SevillaNews::AzureTranslator.translate(excerpt) : nil
+        end
 
         { article: article, translated_title: translated_title, translated_excerpt: translated_excerpt }
       rescue => e
