@@ -1,19 +1,22 @@
 # frozen_string_literal: true
 
+require "cgi"
+
 module ::Jobs
   class SevillaNewsFetch < ::Jobs::Scheduled
+    # Checked frequently; the actual posting cadence is governed by
+    # sevilla_news_interval_hours (see due_to_post?). The frequent check
+    # just means a restart or a slow source can't cause a missed update.
     every 30.minutes
+
+    DEFAULT_INTERVAL_HOURS = 3
 
     def execute(_args)
       return unless SiteSetting.sevilla_news_enabled
       return if SiteSetting.sevilla_news_category_id.to_i <= 0
 
       now = Time.zone.now
-      return if now.hour < SiteSetting.sevilla_news_post_hour
-
-      today_key = now.to_date.to_s
-      last_posted = PluginStore.get(::SevillaNews::PLUGIN_NAME, "last_posted_date")
-      return if last_posted == today_key
+      return unless due_to_post?(now)
 
       limit = SiteSetting.sevilla_news_articles_per_source
       articles = ::SevillaNews::Sources.fetch_all(limit_per_source: limit)
@@ -21,28 +24,95 @@ module ::Jobs
 
       posted_urls = PluginStore.get(::SevillaNews::PLUGIN_NAME, "posted_urls") || []
       new_articles = articles.reject { |a| posted_urls.include?(a.url) }
+
+      # Nothing new since the last update — skip quietly rather than
+      # posting an empty digest, and leave last_posted_at alone so the
+      # next check (30 min later) tries again instead of waiting out
+      # another full interval.
       return if new_articles.empty?
 
       enriched = build_enriched_articles(new_articles)
       return if enriched.empty?
 
-      title = "Sevilla FC News — #{now.strftime("%B %-d, %Y")}"
-      raw = build_post_body(enriched, now)
-
-      PostCreator.create!(
-        Discourse.system_user,
-        title: title,
-        raw: raw,
-        category: SiteSetting.sevilla_news_category_id.to_i,
-        skip_validations: true,
-      )
+      post_digest(enriched, now)
 
       updated_posted_urls = (posted_urls + new_articles.map(&:url)).last(500)
       PluginStore.set(::SevillaNews::PLUGIN_NAME, "posted_urls", updated_posted_urls)
-      PluginStore.set(::SevillaNews::PLUGIN_NAME, "last_posted_date", today_key)
+      PluginStore.set(::SevillaNews::PLUGIN_NAME, "last_posted_at", now.iso8601)
     end
 
     private
+
+    def interval_hours
+      hours = SiteSetting.sevilla_news_interval_hours.to_i
+      hours.positive? ? hours : DEFAULT_INTERVAL_HOURS
+    end
+
+    def due_to_post?(now)
+      last_posted_at = PluginStore.get(::SevillaNews::PLUGIN_NAME, "last_posted_at")
+      return true if last_posted_at.blank?
+
+      Time.zone.parse(last_posted_at) <= now - interval_hours.hours
+    rescue ArgumentError, TypeError
+      # Unparseable stored value (e.g. left over from an older version) —
+      # treat as "never posted" rather than blocking forever.
+      true
+    end
+
+    def post_digest(enriched, now)
+      raw = build_post_body(enriched, now)
+      category_id = SiteSetting.sevilla_news_category_id.to_i
+
+      topic_id = SiteSetting.sevilla_news_new_topic_per_update ? nil : todays_topic_id(now)
+
+      if topic_id
+        PostCreator.create!(
+          Discourse.system_user,
+          topic_id: topic_id,
+          raw: raw,
+          skip_validations: true,
+        )
+      else
+        post =
+          PostCreator.create!(
+            Discourse.system_user,
+            title: topic_title(now),
+            raw: raw,
+            category: category_id,
+            skip_validations: true,
+          )
+
+        unless SiteSetting.sevilla_news_new_topic_per_update
+          PluginStore.set(
+            ::SevillaNews::PLUGIN_NAME,
+            "current_topic",
+            { "date" => now.to_date.to_s, "topic_id" => post.topic_id },
+          )
+        end
+      end
+    end
+
+    def topic_title(now)
+      if SiteSetting.sevilla_news_new_topic_per_update
+        "Sevilla FC News — #{now.strftime("%B %-d, %Y, %-I:%M %p")}"
+      else
+        "Sevilla FC News — #{now.strftime("%B %-d, %Y")}"
+      end
+    end
+
+    # The topic we started earlier today, if there is one and it still
+    # exists (it may have been deleted by a moderator, in which case we
+    # start a fresh one rather than erroring).
+    def todays_topic_id(now)
+      current = PluginStore.get(::SevillaNews::PLUGIN_NAME, "current_topic")
+      return nil unless current.is_a?(Hash)
+      return nil unless current["date"] == now.to_date.to_s
+
+      topic_id = current["topic_id"]
+      return nil if topic_id.blank?
+
+      Topic.where(id: topic_id, deleted_at: nil).exists? ? topic_id : nil
+    end
 
     def build_enriched_articles(new_articles)
       new_articles.filter_map do |article|
@@ -76,7 +146,14 @@ module ::Jobs
         by_source.map do |source, items|
           lines =
             items.map do |item|
-              line = "- **[#{item[:translated_title]}](#{item[:article].url})**"
+              # Raw <a target="_blank"> rather than markdown [text](url) so
+              # these links always open in a new tab regardless of a
+              # reader's own "open external links in new tab" preference —
+              # Discourse's sanitizer explicitly allows target="_blank" and
+              # adds rel="noopener" itself.
+              title = CGI.escapeHTML(item[:translated_title])
+              url = CGI.escapeHTML(item[:article].url)
+              line = "- **<a href=\"#{url}\" target=\"_blank\" rel=\"noopener noreferrer\">#{title}</a>**"
               line += "\n  #{item[:translated_excerpt]}" if item[:translated_excerpt].present?
               line
             end
@@ -85,7 +162,7 @@ module ::Jobs
         end
 
       <<~MARKDOWN
-        Daily Sevilla FC news roundup — #{now.strftime("%B %-d, %Y")}. Headlines and short excerpts, translated from Spanish where needed, with links back to the original articles.
+        *Sevilla FC news update — #{now.strftime("%B %-d, %Y at %-I:%M %p")}. Headlines and short excerpts, translated from Spanish where needed, with links back to the original articles.*
 
         #{sections.join("\n\n")}
       MARKDOWN

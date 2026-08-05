@@ -5,4 +5,5 @@ en:
     sevilla_news_azure_translator_key: "Azure AI Translator subscription key used to translate headlines and excerpts from Spanish to English. Leave blank to post original Spanish text untranslated."
     sevilla_news_azure_translator_region: "Azure resource region (e.g. eastus), required if your Translator resource isn't a 'Global' resource. Leave blank for Global resources."
     sevilla_news_articles_per_source: "How many of the latest articles to pull from each source per day."
-    sevilla_news_post_hour: "Server-local hour (0-23) after which the daily digest topic is posted. The job checks every 30 minutes and posts once per calendar day, at or after this hour."
+    sevilla_news_interval_hours: "How many hours between news updates (default 3). The job checks every 30 minutes and posts whenever this much time has passed since the last update AND there are new articles to report."
+    sevilla_news_new_topic_per_update: "Off (default): one topic per day, with each update added as a reply to that day's topic. On: every update creates its own new topic — note that at a 3-hour interval this means up to 8 new topics a day."

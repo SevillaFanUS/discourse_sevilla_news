@@ -23,8 +23,12 @@ plugins:
     min: 1
     max: 15
 
-  sevilla_news_post_hour:
+  sevilla_news_interval_hours:
     client: false
-    default: 8
-    min: 0
-    max: 23
+    default: 3
+    min: 1
+    max: 24
+
+  sevilla_news_new_topic_per_update:
+    client: false
+    default: false

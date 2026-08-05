@@ -23,9 +23,17 @@ be added in a follow-up if it turns out to be worth it.
 ## How it works
 
 - A scheduled job (`SevillaNewsFetch`) runs every 30 minutes.
-- It only actually posts once per calendar day, at or after
-  `sevilla_news_post_hour` (server-local time) — the frequent check just
-  makes sure a restart or slow site doesn't cause a missed day.
+- It actually posts an update whenever `sevilla_news_interval_hours`
+  (default 3) has elapsed since the last one **and** there's at least one
+  article nobody's seen yet. The frequent check just means a restart or a
+  slow source can't cause a missed update.
+- By default all of a day's updates land in a single topic
+  ("Sevilla FC News — August 4, 2026"), with each new update added as a
+  reply. Flip `sevilla_news_new_topic_per_update` on if you'd rather have
+  a separate topic per update instead.
+- If there's nothing new when an update is due, it stays quiet rather
+  than posting an empty digest, and re-checks 30 minutes later instead of
+  waiting out another full interval.
 - Each run pulls the latest headlines from every source in
   `lib/sevilla_news/sources.rb` — RSS feeds where available (`RSS_SOURCES`),
   plus two scraped listing pages (ElDesmarque, Estadio Deportivo) for the
@@ -75,8 +83,12 @@ Admin > Settings > search "sevilla_news":
   5/source/day is ~35 articles/day at the ceiling, though in practice
   most days will have far fewer *new* ones once the posted-URL dedup
   kicks in.
-- **sevilla_news_post_hour** — server-local hour (0–23) the digest posts
-  at or after (default 8, i.e. 8am).
+- **sevilla_news_interval_hours** — hours between updates (default 3,
+  max 24). Set to 24 for the old once-a-day behaviour.
+- **sevilla_news_new_topic_per_update** — off by default (one topic per
+  day, updates appended as replies). Turn on for a separate topic per
+  update — at a 3-hour interval that's up to 8 new topics a day, so it's
+  worth thinking about before enabling.
 
 ## Adding another source
 
