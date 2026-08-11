@@ -59,6 +59,10 @@ module ::Jobs
       true
     end
 
+    # Longest headline we'll splice into a topic title, before the
+    # " — Sevilla FC news, <date>" suffix is appended.
+    MAX_HEADLINE_IN_TITLE = 90
+
     def post_digest(enriched, now)
       raw = build_post_body(enriched, now)
       category_id = SiteSetting.sevilla_news_category_id.to_i
@@ -76,7 +80,7 @@ module ::Jobs
         post =
           PostCreator.create!(
             Discourse.system_user,
-            title: topic_title(now),
+            title: topic_title(now, enriched),
             raw: raw,
             category: category_id,
             skip_validations: true,
@@ -92,12 +96,46 @@ module ::Jobs
       end
     end
 
-    def topic_title(now)
+    # A title like "Sevilla FC News — August 10, 2026" is invisible to
+    # anyone searching for the actual story, so lead with the day's top
+    # headline and keep the date for uniqueness:
+    #
+    #   Fran González signs through 2031 — Sevilla FC news, Aug 10, 2026
+    #
+    # Only the first post of the day sets the title; later updates append
+    # as replies and deliberately leave it alone rather than churning it
+    # every three hours.
+    def topic_title(now, enriched = nil)
+      return generic_title(now) unless SiteSetting.sevilla_news_headline_in_title
+
+      lead = lead_headline(enriched)
+      return generic_title(now) if lead.blank?
+
+      "#{lead} — Sevilla FC news, #{now.strftime("%b %-d, %Y")}"
+    end
+
+    def generic_title(now)
       if SiteSetting.sevilla_news_new_topic_per_update
         "Sevilla FC News — #{now.strftime("%B %-d, %Y, %-I:%M %p")}"
       else
         "Sevilla FC News — #{now.strftime("%B %-d, %Y")}"
       end
+    end
+
+    def lead_headline(enriched)
+      headline = enriched&.first&.dig(:translated_title).to_s.strip
+      return nil if headline.length < 10
+
+      truncate_on_word(headline, MAX_HEADLINE_IN_TITLE)
+    end
+
+    def truncate_on_word(text, limit)
+      return text if text.length <= limit
+
+      cut = text[0...limit]
+      boundary = cut.rindex(" ")
+      cut = cut[0...boundary] if boundary
+      "#{cut.sub(/[[:punct:]]+\z/, "")}…"
     end
 
     # The topic we started earlier today, if there is one and it still

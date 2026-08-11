@@ -2,7 +2,7 @@
 
 # name: discourse-sevilla-news
 # about: Posts a daily topic collecting the latest Sevilla FC news headlines (with short excerpts) from trusted Spanish sources, translated to English via Azure AI Translator, with links back to the originals.
-# version: 0.1.0
+# version: 0.2.0
 # authors: Chris Lail
 # url: https://forum.monchismen.com
 

@@ -7,3 +7,4 @@ en:
     sevilla_news_articles_per_source: "How many of the latest articles to pull from each source per day."
     sevilla_news_interval_hours: "How many hours between news updates (default 3). The job checks every 30 minutes and posts whenever this much time has passed since the last update AND there are new articles to report."
     sevilla_news_new_topic_per_update: "Off (default): one topic per day, with each update added as a reply to that day's topic. On: every update creates its own new topic — note that at a 3-hour interval this means up to 8 new topics a day."
+    sevilla_news_headline_in_title: "On (default): lead the topic title with the day's top headline, e.g. 'Fran González signs through 2031 — Sevilla FC news, Aug 10, 2026'. Far more findable in search than a date-only title. Off: use the plain 'Sevilla FC News — <date>' format."
